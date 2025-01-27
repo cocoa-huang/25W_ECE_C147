@@ -46,7 +46,7 @@ class KNN(object):
         #   training point using norm(), and store the result in dists[i, j].     
         # ================================================================ #
 
-        pass
+        dists[i, j] = norm(X[i] - self.X_train[j])
 
         # ================================================================ #
         # END YOUR CODE HERE
@@ -83,7 +83,10 @@ class KNN(object):
     #   array.
     # ================================================================ #
 
-    pass
+    test_squared = np.sum(X**2, axis=1).reshape(num_test, 1)
+    train_squared = np.sum(self.X_train**2, axis=1).reshape(1, num_train)
+
+    dists = np.sqrt(test_squared + train_squared - 2 * np.dot(X, self.X_train.T))
 
     # ================================================================ #
     # END YOUR CODE HERE
@@ -110,7 +113,7 @@ class KNN(object):
     for i in np.arange(num_test):
       # A list of length k storing the labels of the k nearest neighbors to
       # the ith test point.
-      closest_y = []
+      closest_y = self.y_train[np.argsort(dists[i])[:k]]
       # ================================================================ #
       # YOUR CODE HERE:
       #   Use the distances to calculate and then store the labels of 
@@ -121,8 +124,8 @@ class KNN(object):
       #   neighbors.  Store the predicted label of the ith training example
       #   as y_pred[i].  Break ties by choosing the smaller label.
       # ================================================================ #
-  
-      pass
+      y_pred[i] = np.bincount(closest_y).argmax()
+      
 
       # ================================================================ #
       # END YOUR CODE HERE
