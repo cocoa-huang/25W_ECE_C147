@@ -67,7 +67,7 @@ class TwoLayerNet(object):
     W1, b1 = self.params['W1'], self.params['b1']
     W2, b2 = self.params['W2'], self.params['b2']
     N, D = X.shape
-
+    
     # Compute the forward pass
     scores = None
 
@@ -80,7 +80,8 @@ class TwoLayerNet(object):
     #   use a for loop in your implementation.
     # ================================================================ #
 
-    pass
+    hidden_layer = np.maximum(0, X.dot(W1.T) + b1)
+    scores = hidden_layer.dot(W2.T) + b2
     
     # ================================================================ #
     # END YOUR CODE HERE
@@ -103,7 +104,17 @@ class TwoLayerNet(object):
     # ================================================================ #
 
     # scores is num_examples by num_classes
-    pass
+    # Compute the softmax probabilities
+    exp_scores = np.exp(scores)
+    softmax_probs = exp_scores / np.sum(exp_scores, axis=1, keepdims=True)
+
+    # Compute the loss
+    correct_log_probs = -np.log(softmax_probs[np.arange(N), y])
+    data_loss = np.sum(correct_log_probs) / N
+    reg_loss = 0.5 * reg * (np.sum(W1**2) + np.sum(W2**2))
+    loss = data_loss + reg_loss
+    
+    
     # ================================================================ #
     # END YOUR CODE HERE
     # ================================================================ #
@@ -117,8 +128,25 @@ class TwoLayerNet(object):
     #   dictionary.  e.g., grads['W1'] should store the gradient for
     #   W1, and be of the same size as W1.
     # ================================================================ #
+    dscores = softmax_probs  # shape (N, C)
+    dscores[np.arange(N), y] -= 1        
+    dscores /= N 
+    
+    dW2 = dscores.T.dot(hidden_layer)   # shape (C, H)
+    db2 = np.sum(dscores, axis=0)      # shape (C,)
+    dW2 += reg * W2
+    dhidden = dscores.dot(W2)  # shape (N, H)
+    dhidden[hidden_layer <= 0] = 0
+    dW1 = dhidden.T.dot(X)  # shape (H, D)
+    db1 = np.sum(dhidden, axis=0)  # shape (H,)
+    dW1 += reg * W1
 
-    pass
+    grads = {
+        'W2': dW2,
+        'b2': db2,
+        'W1': dW1,
+        'b1': db1
+    }
 
     # ================================================================ #
     # END YOUR CODE HERE
@@ -163,7 +191,9 @@ class TwoLayerNet(object):
       # YOUR CODE HERE:
       #   Create a minibatch by sampling batch_size samples randomly.
       # ================================================================ #
-      pass
+      batch_mask = np.random.choice(num_train, batch_size, replace=True)
+      X_batch = X[batch_mask]
+      y_batch = y[batch_mask]
 
       # ================================================================ #
       # END YOUR CODE HERE
@@ -179,7 +209,10 @@ class TwoLayerNet(object):
       #   all parameters (i.e., W1, W2, b1, and b2).
       # ================================================================ #
 
-      pass
+      self.params['W1'] -= learning_rate * grads['W1']
+      self.params['b1'] -= learning_rate * grads['b1']
+      self.params['W2'] -= learning_rate * grads['W2']
+      self.params['b2'] -= learning_rate * grads['b2']
 
       # ================================================================ #
       # END YOUR CODE HERE
@@ -226,8 +259,17 @@ class TwoLayerNet(object):
     # YOUR CODE HERE:
     #   Predict the class given the input data.
     # ================================================================ #
-    pass
-
+    
+    W1, b1 = self.params['W1'], self.params['b1']
+    W2, b2 = self.params['W2'], self.params['b2']
+   
+    hidden_layer = np.maximum(0, X.dot(W1.T) + b1)  
+    scores = hidden_layer.dot(W2.T) + b2           
+    
+    # Take the class with highest score
+    y_pred = np.argmax(scores, axis=1)
+    
+    return y_pred
 
     # ================================================================ #
     # END YOUR CODE HERE

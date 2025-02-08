@@ -47,8 +47,10 @@ class TwoLayerNet(object):
     #   dimensions of W2 should be (hidden_dims, num_classes)
     # ================================================================ #
 
-    pass
-
+    self.params['W1'] = np.random.randn(input_dim, hidden_dims) * weight_scale
+    self.params['b1'] = np.zeros(hidden_dims)
+    self.params['W2'] = np.random.randn(hidden_dims, num_classes) * weight_scale
+    self.params['b2'] = np.zeros(num_classes)
     # ================================================================ #
     # END YOUR CODE HERE
     # ================================================================ #
@@ -81,7 +83,9 @@ class TwoLayerNet(object):
     #   you prior implemented.
     # ================================================================ #    
     
-    pass
+    out1, cache1 = affine_forward(X, self.params['W1'], self.params['b1'])
+    out2, cache2 = relu_forward(out1)
+    scores, cache3 = affine_forward(out2, self.params['W2'], self.params['b2'])
     # ================================================================ #
     # END YOUR CODE HERE
     # ================================================================ #
@@ -105,9 +109,36 @@ class TwoLayerNet(object):
     #
     #   And be sure to use the layers you prior implemented.
     # ================================================================ #    
+    W1, b1 = self.params['W1'], self.params['b1']
+    W2, b2 = self.params['W2'], self.params['b2']
     
-    pass
+    N = X.shape[0]
+    exp_scores = np.exp(scores)
+    probs = exp_scores / np.sum(exp_scores, axis = 1, keepdims=True)
+    correct_logprobs = -np.log(probs[np.arange(N), y])
+    
+    data_loss = np.sum(correct_logprobs) / N
 
+    # L2 regularization for W1, W2
+    reg_loss = 0.5 * self.reg * (np.sum(W1 * W1) + np.sum(W2 * W2))
+    loss = data_loss + reg_loss
+    
+    dscores = probs
+    dscores[np.arange(N), y] -= 1
+    dscores /= N
+    
+    # backprop into second affine layer
+    dout2, dW2, db2 = affine_backward(dscores, cache3)
+    
+    dout1 = relu_backward(dout2, cache2)
+    
+    dx, dW1, db1 = affine_backward(dout1, cache1)
+    
+    grads['W1'] = dW1 + self.reg * self.params['W1']
+    grads['b1'] = db1
+    grads['W2'] = dW2 + self.reg * self.params['W2']
+    grads['b2'] = db2
+    
     # ================================================================ #
     # END YOUR CODE HERE
     # ================================================================ #
@@ -170,7 +201,11 @@ class FullyConnectedNet(object):
     #   so that each parameter has mean 0 and standard deviation weight_scale.
     # ================================================================ #
     
-    pass
+    dims = [input_dim] + hidden_dims + [num_classes]
+    
+    for i in range(1, self.num_layers + 1):
+      self.params[f'W{i}'] = np.random.randn(dims[i - 1], dims[i]) * weight_scale
+      self.params[f'b{i}'] = np.zeros(dims[i])
 
     # ================================================================ #
     # END YOUR CODE HERE
@@ -217,15 +252,32 @@ class FullyConnectedNet(object):
         bn_param[mode] = mode
 
     scores = None
-    
+    caches = []
+    reg_loss = 0.0
+    out = X
     # ================================================================ #
     # YOUR CODE HERE:
     #   Implement the forward pass of the FC net and store the output
     #   scores as the variable "scores".
     # ================================================================ #
 
-    pass
+    for i in range(1, self.num_layers):
+      W, b = self.params[f'W{i}'], self.params[f'b{i}']
+      out, cache = affine_forward(out, W, b)
+      caches.append(cache)
+      
+      reg_loss += 0.5*self.reg*np.sum(W * W)
+      
+      # RELU
+      out, cache_relu = relu_forward(out)
+      caches.append(cache_relu)
 
+    # last layer since range does not include the last layer and we need to output
+    W_last, b_last = self.params[f'W{self.num_layers}'], self.params[f'b{self.num_layers}']
+    scores, cache = affine_forward(out, W_last, b_last)
+    caches.append(cache)
+    reg_loss += 0.5 * self.reg * np.sum(W_last * W_last)
+    
     # ================================================================ #
     # END YOUR CODE HERE
     # ================================================================ #
@@ -242,8 +294,31 @@ class FullyConnectedNet(object):
     #   Be sure your L2 regularization includes a 0.5 factor.
     # ================================================================ #
 
-    pass
+    # softmax loss and grad for scores
+    data_loss, dscores = softmax_loss(scores, y)
+    
+    
+    # Regularization loss
+    reg_loss = 0.5 * self.reg * sum(np.sum(self.params[f'W{i}'] ** 2) for i in range(1, self.num_layers + 1))
+    loss = data_loss + reg_loss 
 
+    # Backpropagate through the last affine layer
+    dout, dW_last, db_last = affine_backward(dscores, caches.pop())
+    grads[f'W{self.num_layers}'] = dW_last + self.reg * self.params[f'W{self.num_layers}']
+    grads[f'b{self.num_layers}'] = db_last
+
+    # Backpropagate through the remaining layers
+    for i in range(self.num_layers - 1, 0, -1):
+        # Backprop through ReLU activation
+        dout = relu_backward(dout, caches.pop())
+        
+        # Backprop through the affine layer
+        dout, dW, db = affine_backward(dout, caches.pop())
+        
+        # Add regularization
+        grads[f'W{i}'] = dW + self.reg * self.params[f'W{i}']
+        grads[f'b{i}'] = db
+        
     # ================================================================ #
     # END YOUR CODE HERE
     # ================================================================ #
